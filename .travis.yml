@@ -17,8 +17,6 @@ cache:
     - $HOME/docker
 
 before_install:
-  # Disable services enabled by default
-  - /etc/init.d/mysql stop
   - git clone https://github.com/mariadb-corporation/connector-test-machine.git
   # Load cached docker images
   - if [[ -d $HOME/docker ]]; then ls $HOME/docker/*.tar.gz | xargs -I {file} sh -c "zcat {file} | docker load"; fi
