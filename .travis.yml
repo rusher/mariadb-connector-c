@@ -3,7 +3,7 @@ dist: bionic
 language: c
 services:
   - docker
-  - mysql
+
 jdk: openjdk11
 addons:
   hosts:
