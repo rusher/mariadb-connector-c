@@ -1,8 +1,7 @@
 os: linux
 dist: bionic
 language: c
-services:
-  - docker
+services: docker
 
 jdk: openjdk11
 addons:
@@ -99,15 +98,10 @@ script:
         cd mysql-test/
         ./mysql-test-run.pl --suite=main ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
     fi
-  - |-
-    if [ -z "$SERVER_BRANCH" ] ; then
-      ###################################################################################################################
-      # run connector test suite
-      ###################################################################################################################
-      cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
-      make
-      openssl ciphers -v
-      echo "Running tests"
-      cd unittest/libmariadb
-      ctest -V
-    fi
+  - cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
+  - if [ -z "$SERVER_BRANCH" ] || [ "$TRAVIS_OS_NAME" -ne "windows" ]; then cmake --build . --config RelWithDebInfo ; fi
+  - if [ -z "$SERVER_BRANCH" ] || [ "$TRAVIS_OS_NAME" -ne "windows" ]; then make ; fi
+  - openssl ciphers -v
+  - cd unittest/libmariadb
+  - ctest -V
+
