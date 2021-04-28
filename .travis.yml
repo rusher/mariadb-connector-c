@@ -1,39 +1,63 @@
-sudo: true
+os: linux
+dist: bionic
 language: c
-cache:
-  apt: true
-  ccache: true
-services: docker
-
+services:
+  - docker
+  - mysql
+jdk: openjdk11
 addons:
   hosts:
     - mariadb.example.com
 
-before_script:
-  # Disable services enabled by default
-  - sudo /etc/init.d/mysql stop
+
+cache:
+  apt: true
+  ccache: true
+  directories:
+    - $HOME/docker
 
 before_install:
-  - chmod -R +x .travis/*
-  - chmod 777 .travis/build/
-  - export PROJ_PATH=`pwd`
-  - export ENTRYPOINT=$PROJ_PATH/.travis/sql
-  - mkdir tmp
-  - .travis/gen-ssl.sh mariadb.example.com tmp
-  - export SSLCERT=$PROJ_PATH/tmp
-matrix:
+  # Disable services enabled by default
+  - sudo /etc/init.d/mysql stop
+  - git clone https://github.com/mariadb-corporation/connector-test-machine.git
+  # Load cached docker images
+  - if [[ -d $HOME/docker ]]; then ls $HOME/docker/*.tar.gz | xargs -I {file} sh -c "zcat {file} | docker load"; fi
+
+install:
+  - |-
+    case $TRAVIS_OS_NAME in
+      windows)
+        choco install openjdk11 maven
+        export PATH=$(cmd.exe //c "refreshenv > nul & C:\Progra~1\Git\bin\bash -c 'echo \$PATH' ")
+        connector-test-machine/launch.bat -t "$srv" -v "$v" -d testc
+        ;;
+      linux)
+        source connector-test-machine/launch.sh -t "$srv" -v "$v" -d testc -n 0 -l "$local" -p "$packet"
+        ;;
+    esac
+
+
+env: LOCAL=0
+
+
+jobs:
   allow_failures:
+    - env: srv=build v=10.6
   include:
-    - env: SKYSQL=true
-    - env: SKYSQL_HA=true MAXSCALE_TEST_DISABLE=true
-# disable for now    - env: DB=mysql:8.0
-# eoled    - env: DB=mariadb:10.1
-    - env: DB=mariadb:10.2
-    - env: DB=mariadb:10.3
-    - env: DB=mariadb:10.4
-    - env: DB=mariadb:10.5
-    - env: DB=mariadb:10.5 MAXSCALE_VERSION=2.5.3 MAXSCALE_TEST_DISABLE=true
-    - env: DB=build:10.6
+    - env: srv=mariadb v=10.5
+      os: windows
+      language: shell
+    - env: srv=mariadb v=10.2 local=1
+    - env: srv=mariadb v=10.3 local=1
+    - env: srv=mariadb v=10.4 local=1
+    - env: srv=mariadb v=10.6 local=1
+    - env: srv=mariadb v=10.5
+    - env: srv=maxscale
+    - env: srv=build v=10.6
+    - env: srv=mysql v=5.7
+    - env: srv=mysql v=8.0
+    - env: srv=skysql
+    - env: srv=skysql-ha
     - env: SERVER_BRANCH=10.2
     - env: SERVER_BRANCH=10.2 TEST_OPTION=--ps-protocol
     - env: SERVER_BRANCH=10.3
@@ -44,8 +68,48 @@ matrix:
     - env: SERVER_BRANCH=10.5 TEST_OPTION=--ps-protocol
 
 script:
-  - if [[ "$DB" == build* ]] ; then .travis/build/build.sh; fi
-  - if [[ "$DB" == build* ]] ; then docker build -t build:10.6 --label build .travis/build/; fi
-  - if [ -z "$DB" ] && [ -z "$SKYSQL" ] && [ -z "$SKYSQL_HA" ] ; then .travis/server-replace-submodule.sh; fi
-  - if [ -n "$DB" ] || [ -n "$SKYSQL" ] || [ -n "$SKYSQL_HA" ]; then .travis/script.sh; fi
+  - |-
+    export MYSQL_TEST_USER=$TEST_DB_USER
+    export MYSQL_TEST_HOST=$TEST_DB_HOST
+    export MYSQL_TEST_PASSWD=$TEST_DB_PASSWORD
+    export MYSQL_TEST_PORT=$TEST_DB_PORT
+    export MYSQL_TEST_DATABASE=testc
+    export MYSQL_TEST_TLS=$TEST_REQUIRE_TLS
 
+    # TEST_DB_SERVER_CERT_STRING server certificate chain
+    # TEST_DB_SERVER_CERT path to server certificate
+    # TEST_DB_RSA_PUBLIC_KEY (mysql) RSA public key
+    # TEST_DB_CLIENT_KEY client private key
+    # TEST_DB_CLIENT_CERT client cert
+    # TEST_DB_CLIENT_PKCS client pkcs12 store (password 'kspass')
+    # TEST_PAM_USER and TEST_PAM_PWD
+    # TEST_MAXSCALE_TLS_PORT
+
+    if [ -n "$SERVER_BRANCH" ] ; then
+        ###################################################################################################################
+        # run server test suite
+        ###################################################################################################################
+        git clone -b ${SERVER_BRANCH} https://github.com/mariadb/server ../workdir-server
+        cd ../workdir-server
+        # don't pull in submodules. We want the latest C/C as libmariadb
+        # build latest server with latest C/C as libmariadb
+        # skip to build some storage engines to speed up the build
+        cmake -DPLUGIN_MROONGA=NO -DPLUGIN_ROCKSDB=NO -DPLUGIN_SPIDER=NO -DPLUGIN_TOKUDB=NO
+        cd libmariadb
+        git checkout ${TRAVIS_COMMIT}
+        cd ..
+        git add libmariadb
+        make -j9
+        cd mysql-test/
+        ./mysql-test-run.pl --suite=main ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
+    else
+      ###################################################################################################################
+      # run connector test suite
+      ###################################################################################################################
+      cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
+      make
+      openssl ciphers -v
+      echo "Running tests"
+      cd unittest/libmariadb
+      ctest -V
+    fi
