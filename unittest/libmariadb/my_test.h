@@ -73,7 +73,7 @@ if (IS_SKYSQL(hostname)) \
 #define SKIP_NOTLS
 #endif
 
-#define IS_MAXSCALE() (getenv("MAXSCALE_TEST_DISABLE")!=NULL)
+#define IS_MAXSCALE() (getenv("srv") == "maxscale" || getenv("srv") == "skysql-ha")
 #define SKIP_MAXSCALE \
 if (IS_MAXSCALE()) \
 { \
