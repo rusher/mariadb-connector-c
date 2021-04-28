@@ -554,7 +554,7 @@ static int reset_connection(MYSQL *mysql) {
 void get_envvars() {
   char  *envvar;
 
-  if (getenv("MYSQL_TEST_TRAVIS"))
+  if (getenv("TRAVIS_JOB_ID"))
     travis_test= 1;
 
   if (!hostname && (envvar= getenv("MYSQL_TEST_HOST")))

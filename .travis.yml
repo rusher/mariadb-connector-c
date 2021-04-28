@@ -66,15 +66,13 @@ jobs:
     - env: SERVER_BRANCH=10.5 TEST_OPTION=--ps-protocol
 
 script:
-  - |-
-    export MYSQL_TEST_USER=$TEST_DB_USER
-    export MYSQL_TEST_HOST=$TEST_DB_HOST
-    export MYSQL_TEST_PASSWD=$TEST_DB_PASSWORD
-    export MYSQL_TEST_PORT=$TEST_DB_PORT
-    export MYSQL_TEST_DB=testc
-    export MYSQL_TEST_TLS=$TEST_REQUIRE_TLS
-    export SSLCERT=$TEST_DB_SERVER_CERT
-
+  - export MYSQL_TEST_USER=$TEST_DB_USER
+  - export MYSQL_TEST_HOST=$TEST_DB_HOST
+  - export MYSQL_TEST_PASSWD=$TEST_DB_PASSWORD
+  - export MYSQL_TEST_PORT=$TEST_DB_PORT
+  - export MYSQL_TEST_DB=testc
+  - export MYSQL_TEST_TLS=$TEST_REQUIRE_TLS
+  - export SSLCERT=$TEST_DB_SERVER_CERT
     # TEST_DB_SERVER_CERT_STRING server certificate chain
     # TEST_DB_RSA_PUBLIC_KEY (mysql) RSA public key
     # TEST_DB_CLIENT_KEY client private key
@@ -82,7 +80,7 @@ script:
     # TEST_DB_CLIENT_PKCS client pkcs12 store (password 'kspass')
     # TEST_PAM_USER and TEST_PAM_PWD
     # TEST_MAXSCALE_TLS_PORT
-
+  - |-
     if [ -n "$SERVER_BRANCH" ] ; then
         ###################################################################################################################
         # run server test suite
@@ -100,7 +98,9 @@ script:
         make -j9
         cd mysql-test/
         ./mysql-test-run.pl --suite=main ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
-    else
+    fi
+  - |-
+    if [ -z "$SERVER_BRANCH" ] ; then
       ###################################################################################################################
       # run connector test suite
       ###################################################################################################################
