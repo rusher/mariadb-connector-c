@@ -283,6 +283,7 @@ static int test_cursors_with_union(MYSQL *mysql)
 
 static int test_cursors_with_procedure(MYSQL *mysql)
 {
+  SKIP_MYSQL(mysql);
   const char *queries[]=
   {
     "SELECT * FROM t1 procedure analyse()"
@@ -1496,7 +1497,7 @@ static int test_bug38486(MYSQL *mysql)
   stmt= mysql_stmt_init(mysql);
   rc= mysql_stmt_attr_set(stmt, STMT_ATTR_CURSOR_TYPE, (void*)&type);
   check_stmt_rc(rc, stmt);
-  stmt_text= "CREATE TABLE t1 (a INT)";
+  stmt_text= "CREATE TABLE t10 (a INT)";
   rc= mysql_stmt_prepare(stmt, SL(stmt_text));
   check_stmt_rc(rc, stmt);
   rc= mysql_stmt_execute(stmt);
@@ -1505,7 +1506,7 @@ static int test_bug38486(MYSQL *mysql)
   stmt= mysql_stmt_init(mysql);
   rc= mysql_stmt_attr_set(stmt, STMT_ATTR_CURSOR_TYPE, (void*)&type);
   check_stmt_rc(rc, stmt);
-  stmt_text= "INSERT INTO t1 VALUES (1)";
+  stmt_text= "INSERT INTO t10 VALUES (1)";
   rc= mysql_stmt_prepare(stmt, SL(stmt_text));
   check_stmt_rc(rc, stmt);
   rc= mysql_stmt_execute(stmt);

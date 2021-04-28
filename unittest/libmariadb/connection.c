@@ -1743,6 +1743,7 @@ static int test_conc366(MYSQL *mysql)
 
 static int test_conc392(MYSQL *mysql)
 {
+  SKIP_MYSQL(mysql);
   int rc;
   const char *data;
   size_t len;

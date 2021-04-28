@@ -93,6 +93,8 @@ script:
   - export MYSQL_TEST_DB=testc
   - export MYSQL_TEST_TLS=$TEST_REQUIRE_TLS
   - export SSLCERT=$TEST_DB_SERVER_CERT
+  - export MYSQL_TEST_PLUGINDIR=`pwd`
+  - if [ -n "$MYSQL_TEST_SSL_PORT" ] ; then export MYSQL_TEST_SSL_PORT=$MYSQL_TEST_SSL_PORT ; fi
     # TEST_DB_SERVER_CERT_STRING server certificate chain
     # TEST_DB_RSA_PUBLIC_KEY (mysql) RSA public key
     # TEST_DB_CLIENT_KEY client private key
