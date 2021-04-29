@@ -51,7 +51,7 @@ else
 
   cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
 
-  if [ "$TRAVIS_OS_NAME" -eq "windows" ]; then
+  if [ "$TRAVIS_OS_NAME" = "windows" ] ; then
     echo "build from windows"
     cmake --build . --config RelWithDebInfo
   else

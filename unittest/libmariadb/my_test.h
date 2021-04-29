@@ -496,6 +496,8 @@ MYSQL *test_connect(struct my_tests_st *test)
   }
   mysql_options(mysql, MYSQL_REPORT_DATA_TRUNCATION, &truncation_report);
   mysql_options(mysql, MYSQL_OPT_CONNECT_TIMEOUT, &timeout);
+  if (plugindir)
+    mysql_options(my, MYSQL_PLUGIN_DIR, plugindir);
 
   /* option handling */
   if (test && test->options) {
