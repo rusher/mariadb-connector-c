@@ -1494,14 +1494,8 @@ static int test_bug38486(MYSQL *mysql)
   int rc;
   unsigned long type= CURSOR_TYPE_READ_ONLY;
 
-  stmt= mysql_stmt_init(mysql);
-  rc= mysql_stmt_attr_set(stmt, STMT_ATTR_CURSOR_TYPE, (void*)&type);
-  check_stmt_rc(rc, stmt);
-  stmt_text= "CREATE TABLE t10 (a INT)";
-  rc= mysql_stmt_prepare(stmt, SL(stmt_text));
-  check_stmt_rc(rc, stmt);
-  rc= mysql_stmt_execute(stmt);
-  mysql_stmt_close(stmt);
+  rc= mysql_query(mysql, "CREATE TABLE t10 (a INT)");
+  check_mysql_rc(rc, mysql);
 
   stmt= mysql_stmt_init(mysql);
   rc= mysql_stmt_attr_set(stmt, STMT_ATTR_CURSOR_TYPE, (void*)&type);

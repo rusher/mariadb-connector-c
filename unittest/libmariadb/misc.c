@@ -772,6 +772,16 @@ static int test_bug49694(MYSQL *mysql)
   int i;
   FILE *fp;
 
+  diag("Load local infile server : %s", (mysql->server_capabilities & CLIENT_LOCAL_FILES));
+  diag("Load local infile client : %s", (mysql->client_flag & CLIENT_LOCAL_FILES));
+  if (!((mysql->server_capabilities & CLIENT_LOCAL_FILES) &&  \
+           (mysql->options.client_flag & CLIENT_LOCAL_FILES))) { \
+     \
+    return SKIP; \
+  }
+
+
+  SKIP_LOAD_INFILE_DISABLE;
   SKIP_SKYSQL;
 
   rc= mysql_query(mysql, "DROP TABLE IF EXISTS enclist");

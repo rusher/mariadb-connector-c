@@ -36,6 +36,8 @@ else
   export MYSQL_TEST_TLS=$TEST_REQUIRE_TLS
   export SSLCERT=$TEST_DB_SERVER_CERT
   export MYSQL_TEST_PLUGINDIR=`pwd`
+
+  echo "MYSQL_TEST_PLUGINDIR=$MYSQL_TEST_PLUGINDIR"
   if [ -n "$MYSQL_TEST_SSL_PORT" ] ; then
     export MYSQL_TEST_SSL_PORT=$MYSQL_TEST_SSL_PORT
   fi
@@ -56,6 +58,8 @@ else
     echo "build from linux"
     make
   fi
+
+  ls -lrt
 
   openssl ciphers -v
   cd unittest/libmariadb
