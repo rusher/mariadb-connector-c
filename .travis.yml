@@ -66,5 +66,5 @@ jobs:
     - env: SERVER_BRANCH=10.5
     - env: SERVER_BRANCH=10.5 TEST_OPTION=--ps-protocol
 
-script: travis.sh
+script: ./travis.sh
 
