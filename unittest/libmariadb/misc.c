@@ -778,8 +778,8 @@ static int test_bug49694(MYSQL *mysql)
   int i;
   FILE *fp;
 
-  diag("Load local infile server : %s", (mysql->server_capabilities & CLIENT_LOCAL_FILES));
-  diag("Load local infile client : %s", (mysql->client_flag & CLIENT_LOCAL_FILES));
+  diag("Load local infile server : %ld", (mysql->server_capabilities & CLIENT_LOCAL_FILES));
+  diag("Load local infile client : %ld", (mysql->client_flag & CLIENT_LOCAL_FILES));
   if (!((mysql->server_capabilities & CLIENT_LOCAL_FILES) &&  \
            (mysql->options.client_flag & CLIENT_LOCAL_FILES))) { \
      \

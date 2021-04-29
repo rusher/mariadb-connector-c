@@ -64,6 +64,8 @@ static int execute_direct(MYSQL *mysql)
   FAIL_IF(mysql_num_rows(res) != 1000, "Expected 1000 rows");
 
   mysql_free_result(res);
+  rc= mysql_query(mysql, "COMMIT");
+  check_mysql_rc(rc, mysql);
 
   rc= mysql_query(mysql, "DROP TABLE t1");
   check_mysql_rc(rc, mysql);
