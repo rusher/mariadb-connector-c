@@ -475,6 +475,9 @@ static int test_wl4166_2(MYSQL *mysql)
                   "alter table t1 change column c_int c_int varchar(11)");
   check_mysql_rc(rc, mysql);
 
+  rc= mysql_query(mysql, "FLUSH TABLES");
+  check_mysql_rc(rc, mysql);
+
   rc= mysql_stmt_execute(stmt);
   check_stmt_rc(rc, stmt);
 
@@ -507,6 +510,9 @@ static int test_wl4166_2(MYSQL *mysql)
 
   /* alter table and increase the number of columns */
   rc= mysql_query(mysql, "alter table t1 add column d_int int");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "FLUSH TABLES");
   check_mysql_rc(rc, mysql);
 
   rc= mysql_stmt_execute(stmt);
@@ -856,6 +862,9 @@ static int test_ldi_path(MYSQL *mysql)
   check_mysql_rc(rc, mysql);
 
   rc= mysql_query(mysql, "CREATE TABLE t1 (a int)");
+  check_mysql_rc(rc, mysql);
+
+  rc= mysql_query(mysql, "FLUSH TABLES");
   check_mysql_rc(rc, mysql);
 
 #ifdef _WIN32

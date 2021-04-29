@@ -57,14 +57,8 @@ jobs:
     - env: srv=mysql v=8.0 native=1
     - env: srv=skysql
     - env: srv=skysql-ha
-    - env: SERVER_BRANCH=10.2
-    - env: SERVER_BRANCH=10.2 TEST_OPTION=--ps-protocol
-    - env: SERVER_BRANCH=10.3
-    - env: SERVER_BRANCH=10.3 TEST_OPTION=--ps-protocol
-    - env: SERVER_BRANCH=10.4
-    - env: SERVER_BRANCH=10.4 TEST_OPTION=--ps-protocol
-    - env: SERVER_BRANCH=10.5
-    - env: SERVER_BRANCH=10.5 TEST_OPTION=--ps-protocol
+    - env: SERVER_BRANCH=10.6
+    - env: SERVER_BRANCH=10.6 TEST_OPTION=--ps-protocol
 
 script: ./travis.sh
 
