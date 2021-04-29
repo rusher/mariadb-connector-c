@@ -1,18 +1,18 @@
 #!/bin/bash
 
-set -o pipefail
+set -eo pipefail
 
 if [ -n "$SERVER_BRANCH" ] ; then
-
   ###################################################################################################################
   # run server test suite
   ###################################################################################################################
+  echo "run server test suite"
   git clone -b ${SERVER_BRANCH} https://github.com/mariadb/server ../workdir-server
   cd ../workdir-server
   # don't pull in submodules. We want the latest C/C as libmariadb
   # build latest server with latest C/C as libmariadb
   # skip to build some storage engines to speed up the build
-  cmake -DPLUGIN_MROONGA=NO -DPLUGIN_ROCKSDB=NO -DPLUGIN_SPIDER=NO -DPLUGIN_TOKUDB=NO
+  cmake . -DPLUGIN_MROONGA=NO -DPLUGIN_ROCKSDB=NO -DPLUGIN_SPIDER=NO -DPLUGIN_TOKUDB=NO
   cd libmariadb
   git checkout ${TRAVIS_COMMIT}
   cd ..
@@ -22,9 +22,11 @@ if [ -n "$SERVER_BRANCH" ] ; then
   ./mysql-test-run.pl --suite=main ${TEST_OPTION} --parallel=auto --skip-test=session_tracker_last_gtid
 
 else
+
   ###################################################################################################################
   # run connector test suite
   ###################################################################################################################
+  echo "run connector test suite"
 
   export MYSQL_TEST_USER=$TEST_DB_USER
   export MYSQL_TEST_HOST=$TEST_DB_HOST
@@ -45,11 +47,13 @@ else
   # TEST_PAM_USER and TEST_PAM_PWD
   # TEST_MAXSCALE_TLS_PORT
 
-  cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
+  cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
 
   if [ "$TRAVIS_OS_NAME" -eq "windows" ]; then
+    echo "build from windows"
     cmake --build . --config RelWithDebInfo
   else
+    echo "build from linux"
     make
   fi
 
