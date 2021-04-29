@@ -1494,6 +1494,9 @@ static int test_bug38486(MYSQL *mysql)
   int rc;
   unsigned long type= CURSOR_TYPE_READ_ONLY;
 
+  rc= mysql_query(mysql, "DROP TABLE IF EXISTS t10");
+  check_mysql_rc(rc, mysql);
+
   rc= mysql_query(mysql, "CREATE TABLE t10 (a INT)");
   check_mysql_rc(rc, mysql);
 

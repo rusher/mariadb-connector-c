@@ -35,21 +35,13 @@ else
   export MYSQL_TEST_DB=testc
   export MYSQL_TEST_TLS=$TEST_REQUIRE_TLS
   export SSLCERT=$TEST_DB_SERVER_CERT
-  #export MYSQL_TEST_PLUGINDIR=`pwd`
   export MARIADB_PLUGIN_DIR=$PWD
+
   echo "MYSQL_TEST_PLUGINDIR=$MYSQL_TEST_PLUGINDIR"
   if [ -n "$MYSQL_TEST_SSL_PORT" ] ; then
     export MYSQL_TEST_SSL_PORT=$MYSQL_TEST_SSL_PORT
   fi
-  # TEST_DB_SERVER_CERT_STRING server certificate chain
-  # TEST_DB_RSA_PUBLIC_KEY (mysql) RSA public key
-  # TEST_DB_CLIENT_KEY client private key
-  # TEST_DB_CLIENT_CERT client cert
-  # TEST_DB_CLIENT_PKCS client pkcs12 store (password 'kspass')
-  # TEST_PAM_USER and TEST_PAM_PWD
-  # TEST_MAXSCALE_TLS_PORT
-
-  cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_SSL=OPENSSL -DCERT_PATH=${SSLCERT}
+  cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCERT_PATH=${SSLCERT}
 
   if [ "$TRAVIS_OS_NAME" = "windows" ] ; then
     echo "build from windows"
