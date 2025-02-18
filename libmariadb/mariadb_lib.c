@@ -737,6 +737,7 @@ struct st_default_options mariadb_defaults[] =
   {{MYSQL_OPT_SSL_VERIFY_SERVER_CERT}, MARIADB_OPTION_BOOL,"tls-verify-peer"},
   {{MARIADB_OPT_RESTRICTED_AUTH}, MARIADB_OPTION_STR, "restricted-auth"},
   {{MYSQL_OPT_ZSTD_COMPRESSION_LEVEL}, MARIADB_OPTION_INT, "zstd-compression-level"},
+  {{MARIADB_OPT_REDIRECT_URL}, MARIADB_OPTION_INT, "redirect-url"},
   {{0}, 0, NULL}
 };
 
@@ -1499,6 +1500,7 @@ mysql_real_connect(MYSQL *mysql, const char *host, const char *user,
   char *end= NULL;
   char *connection_handler= (mysql->options.extension) ?
                             mysql->options.extension->connection_handler : 0;
+  MYSQL *rc;
 
   if (!mysql->options.extension || !mysql->options.extension->tls_verification_callback)
     mysql_optionsv(mysql, MARIADB_OPT_TLS_VERIFICATION_CALLBACK, ma_pvio_tls_verify_server_cert);
@@ -1569,10 +1571,11 @@ mysql_real_connect(MYSQL *mysql, const char *host, const char *user,
     }
   }
 #ifndef HAVE_SCHANNEL
-  return mysql->methods->db_connect(mysql, host, user, passwd,
+  rc= mysql->methods->db_connect(mysql, host, user, passwd,
                                     db, port, unix_socket, client_flag);
+  goto end;
 #else
-/* 
+/*
    With older windows versions (prior Win 10) TLS connections periodically
    fail with SEC_E_INVALID_TOKEN, SEC_E_BUFFER_TOO_SMALL or SEC_E_MESSAGE_ALTERED
    error (see MDEV-13492). If the connect attempt returns on of these error codes
@@ -1584,9 +1587,9 @@ mysql_real_connect(MYSQL *mysql, const char *host, const char *user,
 	MYSQL *my= NULL;
     while (ssl_retry)
     {
-      if ((my= mysql->methods->db_connect(mysql, host, user, passwd,
+      if ((rc= mysql->methods->db_connect(mysql, host, user, passwd,
                                     db, port, unix_socket, client_flag | CLIENT_REMEMBER_OPTIONS)))
-        return my;
+        goto end;
 
       switch (mysql->net.extension->extended_errno) {
         case SEC_E_INVALID_TOKEN:
@@ -1599,11 +1602,52 @@ mysql_real_connect(MYSQL *mysql, const char *host, const char *user,
           break;
       }
     }
-    if (!my && !(client_flag & CLIENT_REMEMBER_OPTIONS))
+    if (!rc && !(client_flag & CLIENT_REMEMBER_OPTIONS))
       mysql_close_options(mysql);
-    return my;
+    goto end;
   }
 #endif
+end:
+  if (!rc)
+    return NULL;
+
+  /* Check redirection */
+  if (mysql->extension->redirect_host)
+  {
+    uchar save_reconnect;
+
+    if (!(mysql->options.extension->redirect_url & MARIADB_REDIRECT_ON_CONNECT))
+      return rc;
+
+    if ((mysql->options.extension->redirect_url & MARIADB_REDIRECT_REQUIRE_TLS) &&
+        !mysql_get_ssl_cipher(mysql))
+      return rc;
+
+    /* Don't connect to the same host */
+    if (!strcmp(mysql->extension->redirect_host, mysql->host) &&
+         (mysql->extension->redirect_port == mysql->port ||
+         (mysql->extension->redirect_port == 0 && mysql->port == mysql_port)))
+    {
+      return rc;
+    }
+
+    save_reconnect= mysql->options.reconnect;
+    mysql->options.reconnect= 1;
+    free(mysql->host);
+    mysql->host= strdup(mysql->extension->redirect_host);
+    if (mysql->extension->redirect_port)
+      mysql->port= mysql->extension->redirect_port;
+    mysql->extension->redirect_port= 0;
+    free(mysql->extension->redirect_host);
+    mysql->extension->redirect_host= NULL;
+    if (mariadb_reconnect(mysql))
+      return 0;
+
+    mysql->options.reconnect= save_reconnect;
+
+    return rc;
+  }
+  return rc;
 }
 
 struct st_host {
@@ -2039,7 +2083,7 @@ restart:
     if (!compression_plugin(net) ||
         (!(compression_ctx(net) = compression_plugin(net)->init_ctx(COMPRESSION_LEVEL_DEFAULT))))
     {
-      int alg= (mysql->client_flag & CLIENT_ZSTD_COMPRESSION) ? 
+      int alg= (mysql->client_flag & CLIENT_ZSTD_COMPRESSION) ?
                COMPRESSION_ZSTD : COMPRESSION_ZLIB;
       compression_plugin(net)= NULL;
       my_set_error(mysql, CR_ERR_LOAD_PLUGIN, SQLSTATE_UNKNOWN, NULL,
@@ -2186,7 +2230,8 @@ my_bool STDCALL mariadb_reconnect(MYSQL *mysql)
   if (!mysql_real_connect(&tmp_mysql,
         mysql->options.host ? NULL : mysql->host,
         mysql->user,mysql->passwd,
-			  mysql->db, mysql->port, mysql->unix_socket,
+			  mysql->db,
+        mysql->port, mysql->unix_socket,
 			  mysql->client_flag | CLIENT_REMEMBER_OPTIONS) ||
       mysql_set_character_set(&tmp_mysql, mysql->charset->csname))
   {
@@ -2431,6 +2476,7 @@ static void mysql_close_memory(MYSQL *mysql)
   free(mysql->db);
   free(mysql->unix_socket);
   free(mysql->server_version);
+  free(mysql->extension->redirect_host);
   mysql->host_info= mysql->host= mysql->unix_socket=
                     mysql->server_version=mysql->user=mysql->passwd=mysql->db=0;
 }
@@ -2650,7 +2696,54 @@ void ma_save_session_track_info(void *ptr, enum enum_mariadb_status_info type, .
 
 mem_error:
   SET_CLIENT_ERROR(mysql, CR_OUT_OF_MEMORY, SQLSTATE_UNKNOWN, 0);
-  return; 
+  return;
+}
+static my_bool ma_parse_redirect(MYSQL *mysql, MARIADB_CONST_STRING url)
+{
+  const char *start= url.str;
+  const char *end= url.str + url.length;
+  const char *pos= start;
+  const char *host_start= NULL,
+             *host_end= NULL;
+
+
+  if (!url.length)
+    return 0;
+
+  if (!strncmp(start, "mariadb://", 10))
+    pos+= 10;
+  else if (!strncmp(start, "mysql://", 8))
+    pos+= 8;
+
+  if (pos == start || pos == end)
+    return 0;
+
+  if (*pos == '[') {
+    host_start= ++pos;
+    if (!(host_end= strchr(host_start, ']')))
+      return 0;
+  } else {
+    host_start= pos;
+    if (!(host_end= strchr(host_start, ':')))
+      host_end= end;
+  }
+  if (host_end > host_start)
+  {
+    if (!(mysql->extension->redirect_host= strndup(host_start, host_end - host_start)))
+      return 1;
+  } else
+    return 0;
+
+  /* save port */
+  if (*host_end == ':')
+  {
+    unsigned int p= 0;
+    for (pos=host_end + 1; pos <= end && isdigit(*pos); pos++)
+      p= p * 10 + (*pos - '0');
+    mysql->extension->redirect_port= p;
+  } else
+    mysql->extension->redirect_port= 0;
+  return 0;
 }
 
 int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
@@ -2754,15 +2847,20 @@ int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
               }
               else if (si_type == SESSION_TRACK_SYSTEM_VARIABLES)
               {
-                my_bool set_charset= 0;
+                my_bool set_charset= 0,
+                        set_redirect= 0;
                 /* make sure that we update charset in case it has changed */
                 if (!strncmp(data1.str, "character_set_client", plen))
                   set_charset= 1;
+                else if (!strncmp(data1.str, "redirect_url", plen))
+                  set_redirect= 1;
+
                 plen= net_field_length(&pos);
                 if (ma_check_buffer_boundaries(mysql, pos, length, plen))
                   goto corrupted;
                 data2.str= (char *)pos;
                 data2.length= plen;
+
 
                 mysql->options.extension->status_callback(mysql->options.extension->status_data,
                                                           SESSION_TRACK_TYPE, si_type,
@@ -2771,6 +2869,19 @@ int ma_read_ok_packet(MYSQL *mysql, uchar *pos, ulong length)
                    goto oom;
 
                 pos+= plen;
+
+                if (set_redirect) {
+                  if (!data2.length && mysql->extension->redirect_host)
+                  {
+                    free(mysql->extension->redirect_host);
+                    mysql->extension->redirect_host = NULL;
+                    mysql->extension->redirect_port = 0;
+                  }
+                  else
+                    if (ma_parse_redirect(mysql, data2))
+                      goto oom;
+                }
+
                 if (set_charset && plen < CHARSET_NAME_LEN &&
                     strncmp(mysql->charset->csname, data2.str, data2.length) != 0)
                 {
@@ -3931,6 +4042,9 @@ mysql_optionsv(MYSQL *mysql,enum mysql_option option, ...)
   case MYSQL_OPT_ZSTD_COMPRESSION_LEVEL:
     OPT_SET_EXTENDED_VALUE(&mysql->options, zstd_compression_level, *((unsigned char *)arg1));
     break;
+  case MARIADB_OPT_REDIRECT_URL:
+    OPT_SET_EXTENDED_VALUE(&mysql->options, redirect_url, *((unsigned int *)arg1));
+    break;
   default:
     va_end(ap);
     SET_CLIENT_ERROR(mysql, CR_NOT_IMPLEMENTED, SQLSTATE_UNKNOWN, 0);
@@ -4158,6 +4272,9 @@ mysql_get_optionv(MYSQL *mysql, enum mysql_option option, void *arg, ...)
     break;
   case MARIADB_OPT_BULK_UNIT_RESULTS:
     *((my_bool *)arg)= mysql->options.extension ? mysql->options.extension->bulk_unit_results : 0;
+    break;
+  case MARIADB_OPT_REDIRECT_URL:
+    *((unsigned int *)arg)= mysql->options.extension->redirect_url;
     break;
   default:
     va_end(ap);
@@ -4841,6 +4958,13 @@ my_bool mariadb_get_infov(MYSQL *mysql, enum mariadb_value value, void *arg, ...
     break;
   case MARIADB_CONNECTION_BYTES_SENT:
     *((size_t *)arg)= mysql->net.pvio->bytes_sent;
+    break;
+  case MARIADB_CONNECTION_REDIRECT_URL:
+    {
+      void *port= va_arg(ap, void *);
+      *((char **)arg)= mysql->extension->redirect_host;
+      *((int *)port)= mysql->extension->redirect_port;
+    }
     break;
   default:
     va_end(ap);

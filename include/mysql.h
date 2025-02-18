@@ -161,6 +161,9 @@ extern const char *SQLSTATE_UNKNOWN;
 
 #define MYSQL_COUNT_ERROR (~(unsigned long long) 0)
 
+#define MARIADB_REDIRECT_OFF              0
+#define MARIADB_REDIRECT_ON_CONNECT       1
+#define MARIADB_REDIRECT_REQUIRE_TLS      (1 << 31)
 
   typedef struct st_mysql_rows {
     struct st_mysql_rows *next;		/* list of rows */
@@ -261,7 +264,8 @@ extern const char *SQLSTATE_UNKNOWN;
     MARIADB_OPT_STATUS_CALLBACK,
     MARIADB_OPT_SERVER_PLUGINS,
     MARIADB_OPT_BULK_UNIT_RESULTS,
-    MARIADB_OPT_TLS_VERIFICATION_CALLBACK
+    MARIADB_OPT_TLS_VERIFICATION_CALLBACK,
+    MARIADB_OPT_REDIRECT_URL
   };
 
   enum mariadb_value {
@@ -302,7 +306,8 @@ extern const char *SQLSTATE_UNKNOWN;
     MARIADB_CONNECTION_BYTES_READ,
     MARIADB_CONNECTION_BYTES_SENT,
     MARIADB_TLS_PEER_CERT_INFO,
-    MARIADB_TLS_VERIFY_STATUS
+    MARIADB_TLS_VERIFY_STATUS,
+    MARIADB_CONNECTION_REDIRECT_URL,
   };
 
   enum mysql_status { MYSQL_STATUS_READY,

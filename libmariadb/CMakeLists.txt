@@ -46,6 +46,9 @@ IF(WITH_SSL)
   SET(MARIADB_LIB_SYMBOLS ${MARIADB_LIB_SYMBOLS} mariadb_deinitialize_ssl)
 ENDIF()
 
+SET(MARIADB_LIB_3_4_5_SYMBOLS
+  mariadb_defaults)
+
 SET(MYSQL_LIB_SYMBOLS
  mysql_affected_rows
  mysql_autocommit
@@ -406,10 +409,14 @@ IF(NOT WIN32)
                    "libmariadb_3_3_5"
                    "${MARIADB_LIB_3_3_5_SYMBOLS}"
                    "")
+  CREATE_EXPORT_FILE(APPEND mariadbclient.def
+                   "libmariadb_3_4_5"
+                   "${MARIADB_LIB_3_4_5_SYMBOLS}"
+                   "")
 ELSE()
   CREATE_EXPORT_FILE(WRITE mariadbclient.def
                    "libmariadb_3"
-                   "${MARIADB_LIB_SYMBOLS};${MYSQL_LIB_SYMBOLS};${MARIADB_LIB_3_3_5_SYMBOLS}"
+                   "${MARIADB_LIB_SYMBOLS};${MYSQL_LIB_SYMBOLS};${MARIADB_LIB_3_3_5_SYMBOLS};${MARIADB_LIB_3_4_5_SYMBOLS}"
                    "")
 ENDIF()
 

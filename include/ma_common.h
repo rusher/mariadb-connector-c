@@ -90,6 +90,7 @@ struct st_mysql_options_extension {
   my_bool tls_allow_invalid_server_cert;
   int (*tls_verification_callback)(MARIADB_TLS *ctls, unsigned int flags);
   unsigned char zstd_compression_level;
+  unsigned int redirect_url;
 };
 
 typedef struct st_connection_handler
@@ -120,6 +121,8 @@ struct st_mariadb_extension {
   unsigned long mariadb_server_capabilities; /* MariaDB specific server capabilities */
   my_bool auto_local_infile;
   my_bool tls_validation;
+  char *redirect_host;
+  unsigned int redirect_port;
 };
 
 #define OPT_EXT_VAL(a,key) \
