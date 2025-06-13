@@ -152,4 +152,5 @@ jobs:
         env:
           MARIADB_CC_TEST: 1
           MYSQL_TEST_TLS: 0
+          srv: ${{ matrix.db-type }}
           MARIADB_PLUGIN_DIR: ${{ github.workspace }}
