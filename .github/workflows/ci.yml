@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: set-matrix
         name: build matrix
-        uses: rusher/mariadb-test-build-matrix@main
+        uses: mariadb-corporation/connector-ci-build-matrix@main
 
   ci-server:
     name: server ${{ matrix.server.version }} test suite ${{ matrix.server.env && format(' {0}', matrix.server.env) || '' }}
@@ -115,7 +115,7 @@ jobs:
 
       - name: Setup Test Environment
         id: setup-env
-        uses: rusher/mariadb-test-setup@master
+        uses: mariadb-corporation/connector-ci-setup@master
         with:
           node-version: ${{ matrix.node }}
           db-type: ${{ matrix.db-type }}
@@ -124,8 +124,8 @@ jobs:
           test-db-database: ${{ env.MYSQL_TEST_DB }}
           test-db-port: ${{ env.MYSQL_TEST_PORT }}
           additional-conf: ${{ matrix.additional-conf || '' }}
-          registry-user: ${{ matrix.db-type == 'enterprise' && secrets.ENTERPRISE_USER || (secrets.DOCKER_PWD != '' && 'mariadbtest' || '') }}
-          registry-password: ${{ matrix.db-type == 'enterprise' && secrets.ENTERPRISE_TOKEN || secrets.DOCKER_PWD }}
+          registry-user: ${{ matrix.db-type == 'enterprise' && secrets.ENTERPRISE_USER || (secrets.DOCKER_TOKEN != '' && secrets.DOCKER_LOGIN || '') }}
+          registry-password: ${{ matrix.db-type == 'enterprise' && secrets.ENTERPRISE_TOKEN || secrets.DOCKER_TOKEN }}
           os: ${{ matrix.os }}
 
       - uses: actions/setup-node@v4
