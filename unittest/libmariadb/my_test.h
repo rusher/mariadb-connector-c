@@ -84,10 +84,9 @@ if (force_tls)\
 
 MYSQL *mysql_default = NULL;  /* default connection */
 
-#define IS_MAXSCALE()\
-   ((mysql_default && strstr(mysql_get_server_info(mysql_default), "maxScale")) ||\
-    (getenv("srv")!=NULL && (strcmp(getenv("srv"), "maxscale") == 0 ||\
-     strcmp(getenv("srv"), "skysql-ha") == 0)))
+#define IS_MAXSCALE() \
+   ((mysql_default && strstr(mysql_get_server_info(mysql_default), "maxScale")) || \
+    (getenv("maxscale-tag") != NULL && strlen(getenv("maxscale-tag")) > 0))
 
 #define SKIP_MAXSCALE \
 if (IS_MAXSCALE()) \
