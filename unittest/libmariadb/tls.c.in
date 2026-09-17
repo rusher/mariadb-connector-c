@@ -68,6 +68,7 @@ static void set_verify(MYSQL *mysql, my_bool onoff)
 {\
   unsigned int status;\
   mariadb_get_infov(mysql, MARIADB_TLS_VERIFY_STATUS, &status);\
+  diag("tls_flags: %d", status);\
   FAIL_IF(!(status & (flag)), (text));\
 }
 
@@ -560,7 +561,7 @@ static int test_cert_expired(MYSQL *my __attribute__((unused)))
   MYSQL *mysql;
 
   /* Set validity in future */
-  if (set_tls_dummy_options("CMD:create_new=True validityStartInSeconds=10000 validityEndInSeconds=2000"))
+  if (set_tls_dummy_options("CMD:create_new=True validityStartInSeconds=10000 validityEndInSeconds=20000"))
   {
     diag("Error when setting TLS options");
     return FAIL;
@@ -1028,6 +1029,95 @@ static int test_auth_switch_hostname_mismatch(MYSQL *my __attribute__((unused)))
   return OK;
 }
 
+static int test_tls_verify_unknown(MYSQL *my __attribute__((unused)))
+{
+  MYSQL *mysql= mysql_init(NULL);
+  int rc= FAIL;
+
+  /* 
+    Configure dummy server to present a leaf certificate signed by an 
+    untrusted CA without sending the CA certificate in the handshake chain.
+  */
+  if (set_tls_dummy_options("CMD:create_new=True cert_mode='leaf'"))
+  {
+    diag("Error when setting TLS options for unknown CA test");
+    return FAIL;
+  }
+
+  /* Force TLS and turn on peer certificate verification */
+  mysql_ssl_set(mysql, NULL, NULL, NULL, NULL, NULL);
+  set_verify(mysql, 1);
+
+  /* Connection should fail during handshake */
+  if (my_test_connect(mysql, tls_dummy_host, "tlsuser", "foo", NULL,
+                      tls_dummy_port, NULL, 0, 0))
+  {
+    diag("Connection unexpectedly succeeded despite missing CA cert!");
+    goto end;
+  }
+
+  /* 
+    Verify that MARIADB_TLS_VERIFY_UNKNOWN was set and survived bitwise masking.
+    Prior to the fix, status would be masked to 0 (MARIADB_TLS_VERIFY_OK).
+  */
+  CHECK_TLS_FLAGS(mysql, MARIADB_TLS_VERIFY_UNKNOWN,
+                  "MARIADB_TLS_VERIFY_UNKNOWN flag was expected for unhandled OpenSSL error");
+
+  FAIL_IF(mysql_errno(mysql) != CR_SSL_CONNECTION_ERROR,
+          "Expected CR_SSL_CONNECTION_ERROR on unknown CA error");
+
+  rc= OK;
+
+end:
+  mysql_close(mysql);
+  return rc;
+}
+
+static int test_tls_verify_critical_ext(MYSQL *my __attribute__((unused)))
+{
+  MYSQL *mysql = mysql_init(NULL);
+  int rc = FAIL;
+
+  /* Instruct python test server to spawn with a self-signed cert containing a critical extension */
+  if (set_tls_dummy_options("CMD:create_new=True custom_critical_ext=True cert_mode='self_signed'"))
+  {
+    diag("Error when setting TLS options for critical extension test");
+    return FAIL;
+  }
+
+  /* Configure client for standard connection (no explicit ssl-ca) */
+  mysql_ssl_set(mysql, NULL, NULL, NULL, NULL, NULL);
+  set_verify(mysql, 1); /* Default / Local mode: standard self-signed would pass */
+
+  /* Connection MUST fail due to the critical extension, even on localhost/local connections */
+  if (my_test_connect(mysql, tls_dummy_host, "tlsuser", "foo", NULL,
+                      tls_dummy_port, NULL, 0, 0))
+  {
+    diag("Connection unexpectedly succeeded on a certificate with an unhandled critical extension!");
+    goto end;
+  }
+
+  /* 
+    Verify MARIADB_TLS_VERIFY_UNKNOWN was set.
+    Status should be MARIADB_TLS_VERIFY_UNKNOWN (32) or 33 (TRUST | UNKNOWN).
+  */
+  if (!(mysql->net.tls_verify_status & MARIADB_TLS_VERIFY_UNKNOWN))
+  {
+    diag("Expected MARIADB_TLS_VERIFY_UNKNOWN flag to be set, got %u",
+         mysql->net.tls_verify_status);
+    goto end;
+  }
+
+  FAIL_IF(mysql_errno(mysql) != CR_SSL_CONNECTION_ERROR,
+          "Expected CR_SSL_CONNECTION_ERROR on critical extension failure");
+
+  rc = OK;
+
+end:
+  mysql_close(mysql);
+  return rc;
+}
+
 struct my_tests_st my_tests[] = {
   /* Don't add test above, test_init needs to be run first */
   {"test_conc795", test_conc795, TEST_CONNECTION_NEW, 0, NULL, NULL},
@@ -1050,6 +1140,8 @@ struct my_tests_st my_tests[] = {
   {"test_wrong_ca", test_wrong_ca, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {"test_crl", test_crl, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {"test_crl_with_fp", test_crl_with_fp, TEST_CONNECTION_NONE, 0, NULL, NULL},
+  {"test_tls_verify_unknown", test_tls_verify_unknown, TEST_CONNECTION_NEW, 0, NULL, NULL},
+  {"test_tls_verify_critical_ext", test_tls_verify_critical_ext, TEST_CONNECTION_NEW, 0, NULL, NULL},
   {"stop_tls_server", stop_tls_server, TEST_CONNECTION_NONE, 0, NULL, NULL},
   {NULL, NULL, 0, 0, NULL, 0}
 };
