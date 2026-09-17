@@ -179,8 +179,10 @@ jobs:
 
       - name: make windows 64bits
         if: ${{ startsWith(matrix.os, 'windows') && (matrix.arch != '32' || !matrix.arch) }}
+        shell: bash
         run: |
-          cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_CURL=ON -DWITH_MSI=ON
+          PYTHON_PATH=$(which python)
+          cmake . -DCMAKE_BUILD_TYPE=RelWithDebInfo -DWITH_CURL=ON -DWITH_MSI=ON -DPython3_EXECUTABLE="$PYTHON_PATH"
           cmake --build . --config RelWithDebInfo
 
       - name: make windows 32bits
